@@ -1,0 +1,175 @@
+---
+title: "ml2_series_temporales"
+author: "luisa"
+date: "22/6/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# ML2 - Series Temporales
+
+# 1. Introducción
+## 1.1. Lenguaje de programación y herramienta de control de versiones utilizado
+**Link del proyecto en GitHub:**
+https://github.com/lyanezgu/ml2_series_temporales
+
+## 1.2. Paquetes de R
+
+```{r}
+library(readr)
+library(tidyverse)
+library(tsibble)
+library(fable)
+library(feasts)
+library(tsibbledata)
+packages =  c("ggplot2", "dplyr", "tidyr", "data.table", 'corrplot', 'gridExtra', 'forecast', 'tseries', 'TSA', 'tibble', 'TTR', 'xts', 'dygraphs', 'assertthat')
+#library(normtest)
+library(VIM)
+library(Amelia)
+library(imputeTS)
+library(gridExtra)
+library(dygraphs)
+library(ggfortify)
+library(vars)
+library(ggplot2)
+library(lubridate)
+library(assertthat)
+library(xts)
+library(MASS)
+library(fpp3)
+library(GGally)
+#ibrary(normtest)
+
+```
+
+# 2. Conjunto de datos 
+
+**Link del dataset:**
+https://www.kaggle.com/datasets/sumanthvrao/daily-climate-time-series-data?resource=download&select=DailyDelhiClimateTest.csv
+
+
+## 2.1. Definición de las variables
+
+Date: fecha en formato YYYY-MM-DD
+
+meantemp: temperatura media calculada en intervalos de tres horas por día
+
+humidity: humedad en el día gramos de vapor de agua por volumen en m3 de aire
+
+wind_speed: velocidad del aire medido en km/h
+
+meanpreassure: presión medida en atm
+
+
+## 2.2. Carga de datos
+
+Cargamos los datos ya dividos entre train y test
+```{r  }
+clima_train<-read.csv("DailyDelhiClimateTrain.csv",sep = ",")
+clima_test<-read.csv("DailyDelhiClimateTest.csv",sep = ",")
+
+
+```
+
+```{r}
+
+head(clima_train)
+
+```
+
+
+```{r}
+summary(clima_train)
+```
+
+
+
+```{r}
+str(clima_train)
+
+```
+
+
+Transformamos formato de variable date de chr a fecha
+```{r}
+clima_train$date<-as.Date(clima_train$date)
+str(clima_train)
+```
+
+Seleccionamos la variable meantemp relativa a la temperatura media en Delhi, que será la que intentaremos predecir.
+```{r}
+temp_train <- clima_train[,c(1,2)]
+head(temp_train)
+```
+
+Creamos el objeto de series temprales  con la función as_tsibble
+```{r}
+
+temp_train_ts<- as_tsibble(temp_train, index = date)
+
+temp_train_ts
+
+```
+
+Grafico de la serie temporal de la variable meantemp
+
+```{r}
+
+temp_train_ts %>%
+  autoplot(meantemp) +
+    labs(title = "Temperatura media Delhi 2013-2017") +
+    xlab("Años") + ylab("Temperatura") 
+
+```
+
+# 3. Análisis de la serie temporal 
+
+## 3.1 Estacionariedad
+
+```{r}
+temp_train_ts%>%
+gg_season(meantemp, labels = "right")
+
+```
+
+
+```{r}
+temp_train_ts %>%
+   model(seats = feasts:::STL(meantemp)) %>%
+  components() %>%
+  autoplot()
+
+```
+
+
+```{r}
+lambda <- temp_train_ts %>%
+features(meantemp, features = guerrero) %>% pull(lambda_guerrero)
+lambda
+
+```
+
+
+```{r}
+temp_train_ts %>%
+  features(meantemp, unitroot_kpss)
+
+
+``` 
+
+El p-valor es menor que 0.05, lo que indica que la hipótesis nula es rechazada. Es decir, los datos no son estacionarios. Se confirma formalmente que los datos no son estacionarios.
+
+
+```{r}
+temp_train_ts %>%
+  features(difference(meantemp, 1), unitroot_kpss)
+
+```
+
+```{r}
+temp_train_ts %>% autoplot(difference(meantemp, 1)) 
+
+```
