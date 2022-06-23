@@ -129,12 +129,15 @@ temp_train_ts %>%
 
 ## 3.1 Estacionariedad
 
+Observando el gráfico parece que hay una componente estacional anual, ya que la forma de las series anuales son iguales.
+
 ```{r}
 temp_train_ts%>%
 gg_season(meantemp, labels = "right")
 
 ```
-
+Calculamos la desdomposición STL para observar si existe tendencia y estacionalidad.
+Gráficamente se puede comprobar que existe estacionalidad y una tendencia creciente.Por tanto, parece se puede decir qu ela serie no es estacionaria en media.
 
 ```{r}
 temp_train_ts %>%
@@ -144,7 +147,7 @@ temp_train_ts %>%
 
 ```
 
-
+Estudiamos la estacionariedad en varianza. Dado que obtenemos un valor muy próximo a 1, no realizaremos ningún cambio o transformación para ajustar la varianza.
 ```{r}
 lambda <- temp_train_ts %>%
 features(meantemp, features = guerrero) %>% pull(lambda_guerrero)
@@ -152,6 +155,7 @@ lambda
 
 ```
 
+Comprobamos la estacionariedad en media usando una prueba de raíces unitarias.
 
 ```{r}
 temp_train_ts %>%
@@ -160,8 +164,11 @@ temp_train_ts %>%
 
 ``` 
 
-El p-valor es menor que 0.05, lo que indica que la hipótesis nula es rechazada. Es decir, los datos no son estacionarios. Se confirma formalmente que los datos no son estacionarios.
+El p-valor es menor que 0.05, lo que indica que la hipótesis nula es rechazada. Es decir, los datos no son estacionarios en media. Se confirma formalmente que los datos no son estacionarios.
 
+
+Para estabilizar la media usamos una diferencia y lo comprobamos con el siguiente test.
+Obtenemos un p_value mayor de 0.05 por lo que cumpliría la hipótesis de estacionariedad y podemos realizar una diferencia regular para eliminar la tendencia.
 
 ```{r}
 temp_train_ts %>%
@@ -171,5 +178,14 @@ temp_train_ts %>%
 
 ```{r}
 temp_train_ts %>% autoplot(difference(meantemp, 1)) 
+
+```
+
+
+Para evaluar si es necesario realizar una diferencia estacional debido a que los datos presentan estacionalidad usaremos unitroot_nsdiffs(). Debido a que es menor a 0.64 el método no sugiere una diferencia estacional
+```{r}
+temp_train_ts %>%
+  mutate(turnover = difference(meantemp,1)) %>%
+  features(turnover, unitroot_nsdiffs)
 
 ```
