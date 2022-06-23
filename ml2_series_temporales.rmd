@@ -136,8 +136,8 @@ temp_train_ts%>%
 gg_season(meantemp, labels = "right")
 
 ```
-Calculamos la desdomposición STL para observar si existe tendencia y estacionalidad.
-Gráficamente se puede comprobar que existe estacionalidad y una tendencia creciente.Por tanto, parece se puede decir qu ela serie no es estacionaria en media.
+Calculamos la descomposición STL para observar si existe tendencia y estacionalidad.
+Gráficamente se puede comprobar que existe estacionalidad y una tendencia creciente.Por tanto, parece se puede decir que la serie no es estacionaria en media.
 
 ```{r}
 temp_train_ts %>%
@@ -182,10 +182,129 @@ temp_train_ts %>% autoplot(difference(meantemp, 1))
 ```
 
 
-Para evaluar si es necesario realizar una diferencia estacional debido a que los datos presentan estacionalidad usaremos unitroot_nsdiffs(). Debido a que es menor a 0.64 el método no sugiere una diferencia estacional
+Para evaluar si es necesario realizar una diferencia estacional debido a que los datos presentan estacionalidad usaremos unitroot_nsdiffs(). Debido a que es menor a 0.64 el método no sugiere una diferencia estacional.
 ```{r}
 temp_train_ts %>%
   mutate(turnover = difference(meantemp,1)) %>%
   features(turnover, unitroot_nsdiffs)
 
 ```
+
+
+```{r}
+# Contraste para los coeficientes
+my_t_test <- function (object, ...) 
+{
+  par <- rbind(t_stat=tidy(object)$statistic, p_value=tidy(object)$p.value)
+  colnames(par) <- tidy(object)$term
+  if (NCOL(par) > 0) {
+    cat("\nt-test:\n")
+    coef <- round(par, digits = 4)
+    print.default(coef, print.gap = 2)
+  }
+}
+
+# Gráfico de correlogramas de residuos
+my_tsresiduals <- function (data, ...) {
+  if (!fabletools::is_mable(data)) {
+    abort("gg_tsresiduals() must be used with a mable containing only one model.")
+  }
+  data <- stats::residuals(data)
+  if (n_keys(data) > 1) {
+    abort("gg_tsresiduals() must be used with a mable containing only one model.")
+  }
+  gg_tsdisplay(data, !!sym(".resid"), plot_type = "partial",  
+    ...)
+}
+
+# Validación cruzada anidada
+
+nested_cv <- function(df, h, last_train, string_formula){
+  
+  nested_errors <- vector()  
+  
+for (i in seq(last_train, last(df$date), h)){
+  train <- df %>% filter(date<=i)
+  test <- df %>% filter(date>i)
+  
+fitted_model <- train %>%
+  model(arima = ARIMA(as.formula(string_formula)))
+
+h_forecast = min(dim(test)[1], h)
+
+fc <- fitted_model %>%
+  forecast(h=h_forecast)
+
+test_err <- fc %>%
+  accuracy(test) %>%
+  select(MAPE)
+nested_errors <- c(nested_errors, test_err$MAPE)
+NewList <- list("errors"=nested_errors, "mean"=mean(nested_errors))
+}
+return(NewList)}
+
+# Test de autocorrelacines de los residuos
+autocorrelation_test_plot <- function(aug, dof = 4, m = 7,  h = 5, alpha = 0.05){
+vec <- c()
+num_lags = seq(1, h*m)
+
+for (i in num_lags){
+ vec <- c(vec,aug %>% features(.resid, ljung_box, lag=i, dof=dof) %>% .$lb_pvalue)
+}
+
+autocorr_pvalues_resid <- tibble(
+  lag = num_lags, 
+  p_value = vec,
+  incorelated = p_value >= alpha
+)
+
+plot <- autocorr_pvalues_resid %>% 
+  drop_na() %>% 
+   ggplot(aes(lag, p_value, color = incorelated)) + 
+  geom_point() + 
+  geom_hline(aes(yintercept = alpha), linetype="dashed", color = "indianred2")
+
+
+newList <- list("values" = autocorr_pvalues_resid, "plot" = plot)
+return(newList)
+}
+
+
+```
+
+```{r}
+fit <- temp_train_ts %>%
+  model(arima = ARIMA(meantemp ~ pdq(0,1,0) + PDQ(0,1,0, period = 7)))
+fit %>% my_tsresiduals(lag_max = 36)
+
+```
+
+
+```{r}
+fit2 <- temp_train_ts %>%
+  model(arima = ARIMA(meantemp ~ pdq(3,1,1) + PDQ(0,1,1, period = 7)))
+fit2 %>% my_tsresiduals(lag_max = 36)
+
+```
+
+
+```{r}
+fit3 <- temp_train_ts %>%
+  model(arima = ARIMA(meantemp ~ pdq(0,1,0) + PDQ(0,0,0, period = 7)))
+fit3 %>% my_tsresiduals(lag_max = 36)
+
+```
+
+
+```{r}
+report(fit2)
+
+```
+
+
+```{r}
+my_t_test(fit2)
+
+```
+
+
