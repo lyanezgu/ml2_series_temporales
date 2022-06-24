@@ -42,6 +42,7 @@ library(MASS)
 library(fpp3)
 library(GGally)
 #ibrary(normtest)
+library(forecast)
 
 ```
 
@@ -307,4 +308,9 @@ my_t_test(fit2)
 
 ```
 
+```{r}
+#ajuste del modelo automatica
 
+autoarima_model<- auto.arima(temp_train_ts)
+autoarima_model
+```
