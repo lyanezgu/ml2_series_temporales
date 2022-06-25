@@ -314,3 +314,11 @@ my_t_test(fit2)
 autoarima_model<- auto.arima(temp_train_ts)
 autoarima_model
 ```
+
+```{r}
+
+fit4 <- temp_train_ts %>%
+  model(arima = ARIMA(meantemp ~ pdq(3,1,2) + PDQ(1,0,0, period = 7)))
+fit4 %>% my_tsresiduals(lag_max = 36)
+
+```
