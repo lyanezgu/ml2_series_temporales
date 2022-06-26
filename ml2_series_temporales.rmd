@@ -1,32 +1,37 @@
 ---
-title: "ml2_series_temporales"
-author: "luisa"
-date: "22/6/2022"
-output: html_document
+title: "ML2 - Time Series"
+author: "Luisa Yanez y Miguel García"
+date: "08/07/2022"
+output: 
+ html_document:
+  code_folding: hide
+  toc: yes
+  toc_float: TRUE
+  toc_depth: 3 
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
 ```
 
 # ML2 - Series Temporales
 
 # 1. Introducción
+
 ## 1.1. Lenguaje de programación y herramienta de control de versiones utilizado
 **Link del proyecto en GitHub:**
 https://github.com/lyanezgu/ml2_series_temporales
 
 ## 1.2. Paquetes de R
 
-```{r}
+```{r librerias, include=TRUE, message=FALSE, warning = FALSE,tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 library(readr)
 library(tidyverse)
 library(tsibble)
 library(fable)
 library(feasts)
 library(tsibbledata)
-packages =  c("ggplot2", "dplyr", "tidyr", "data.table", 'corrplot', 'gridExtra', 'forecast', 'tseries', 'TSA', 'tibble', 'TTR', 'xts', 'dygraphs', 'assertthat')
-#library(normtest)
 library(VIM)
 library(Amelia)
 library(imputeTS)
@@ -41,9 +46,7 @@ library(xts)
 library(MASS)
 library(fpp3)
 library(GGally)
-#ibrary(normtest)
 library(forecast)
-#library(nortest)
 library(tseries)
 
 ```
@@ -56,15 +59,15 @@ https://www.kaggle.com/datasets/sumanthvrao/daily-climate-time-series-data?resou
 
 ## 2.1. Definición de las variables
 
-Date: fecha en formato YYYY-MM-DD
+* **Date:** fecha en formato YYYY-MM-DD
 
-meantemp: temperatura media calculada en intervalos de tres horas por día
+* **meantemp:** temperatura media calculada en intervalos de tres horas por día
 
-humidity: humedad en el día gramos de vapor de agua por volumen en m3 de aire
+* **humidity:** humedad en el día gramos de vapor de agua por volumen en m3 de aire
 
-wind_speed: velocidad del aire medido en km/h
+* **wind_speed:** velocidad del aire medido en km/h
 
-meanpreassure: presión medida en atm
+* **meanpreassure:** presión medida en atm
 
 
 ## 2.2. Carga de datos
@@ -79,7 +82,6 @@ clima_test<-read.csv("DailyDelhiClimateTest.csv",sep = ",")
 
 
 ```{r}
-
 head(clima_train)
 
 ```
@@ -87,9 +89,8 @@ head(clima_train)
 
 ```{r}
 summary(clima_train)
+
 ```
-
-
 
 ```{r}
 str(clima_train)
@@ -98,6 +99,7 @@ str(clima_train)
 
 
 Transformamos formato de variable date de chr a fecha
+
 ```{r}
 clima_train$date<-as.Date(clima_train$date)
 str(clima_train)
@@ -110,19 +112,21 @@ str(clima_test)
 
 
 Seleccionamos la variable meantemp relativa a la temperatura media en Delhi, que será la que intentaremos predecir.
+
 ```{r}
 temp_train <- clima_train[,c(1,2)]
 head(temp_train)
 ```
 
+
 Creamos el objeto de series temprales  con la función as_tsibble
 ```{r}
-
 temp_train_ts<- as_tsibble(temp_train, index = date)
 
 temp_train_ts
 
 ```
+
 
 Grafico de la serie temporal de la variable meantemp
 
@@ -137,7 +141,7 @@ temp_train_ts %>%
 
 # 3. Análisis de la serie temporal 
 
-## 3.1 Estacionariedad
+## 3.1. Estacionariedad
 
 Observando el gráfico parece que hay una componente estacional anual, ya que la forma de las series anuales son iguales.
 
@@ -157,13 +161,18 @@ temp_train_ts %>%
 
 ```
 
+### 3.1.1. Estacionariedad en Varianza
+
 Estudiamos la estacionariedad en varianza. Dado que obtenemos un valor muy próximo a 1, no realizaremos ningún cambio o transformación para ajustar la varianza.
+
 ```{r}
 lambda <- temp_train_ts %>%
 features(meantemp, features = guerrero) %>% pull(lambda_guerrero)
 lambda
 
 ```
+
+### 3.1.2. Estacionariedad en Media
 
 Comprobamos la estacionariedad en media usando una prueba de raíces unitarias.
 
@@ -186,6 +195,7 @@ temp_train_ts %>%
 
 ```
 
+
 ```{r}
 temp_train_ts %>% autoplot(difference(meantemp, 1)) 
 
@@ -193,6 +203,7 @@ temp_train_ts %>% autoplot(difference(meantemp, 1))
 
 
 Para evaluar si es necesario realizar una diferencia estacional debido a que los datos presentan estacionalidad usaremos unitroot_nsdiffs(). Debido a que es menor a 0.64 el método no sugiere una diferencia estacional.
+
 ```{r}
 temp_train_ts %>%
   mutate(turnover = difference(meantemp,1)) %>%
@@ -200,6 +211,8 @@ temp_train_ts %>%
 
 ```
 
+
+## 3.2. Creación del modelo (determinación, estimación y contraste)
 
 ```{r}
 # Contraste para los coeficientes
@@ -282,6 +295,9 @@ return(newList)
 
 ```
 
+
+### 3.2.1. Creación manual del modelo
+
 ```{r}
 fit <- temp_train_ts %>%
   model(arima = ARIMA(meantemp ~ pdq(0,1,0) + PDQ(0,1,0, period = 7)))
@@ -317,6 +333,8 @@ my_t_test(fit2)
 
 ```
 
+### 3.2.2. Creación automática del modelo
+
 ```{r}
 #ajuste del modelo automatica
 
@@ -349,7 +367,7 @@ gg_arma(fit4)
 
 ``` 
 
-## 3.2 Diagnosis de residuos
+## 3.3. Diagnosis de residuos
 
 ```{r}
 aug <-fit4 %>% augment()
@@ -409,28 +427,7 @@ Test de normalidad
 ```
 
 
-## 3.3... Fase de predicción
-
-```{r}
-# Residual accuracy
-resids <- fit4 %>% 
-  accuracy() %>% 
-  dplyr::select(-c(.model, .type, ME, MPE, ACF1, RMSSE)) %>% 
-  mutate(Evaluation='Training') 
-
-# Forecasting
-fc <- fit4 %>%
-  forecast(h=7) 
-
-test_err <- fc %>% 
-  accuracy(temp_train_ts) %>% 
-  dplyr::select(-c(.model, .type, ME, MPE, ACF1, RMSSE)) %>% 
-  mutate(Evaluation='Test')
-
-# Show errors together
-bind_rows(test_err, resids) %>% dplyr::select(Evaluation, everything())
-
-``` 
+## 3.4. Predicción con el modelo
 
 ```{r}
 clima_total<-merge(x=clima_train,y=clima_test,all = TRUE)
@@ -447,6 +444,50 @@ temp_total_ts
 
 ```
 
+```{r}
+# Residual accuracy
+resids <- fit4 %>% 
+  accuracy() %>% 
+  dplyr::select(-c(.model, .type, ME, MPE, ACF1, RMSSE)) %>% 
+  mutate(Evaluation='Training') 
+
+# Forecasting
+fc <- fit4 %>%
+  forecast(h=7) 
+
+test_err <- fc %>% 
+  accuracy(temp_total_ts) %>% 
+  dplyr::select(-c(.model, .type, ME, MPE, ACF1, RMSSE)) %>% 
+  mutate(Evaluation='Test')
+
+# Show errors together
+bind_rows(test_err, resids) %>% dplyr::select(Evaluation, everything())
+
+``` 
+
+
+```{r}
+aug %>%  ggplot() +
+  geom_line(aes(x = date, y = .fitted), color="navy") +
+  geom_line(aes(x = date, y = meantemp), color="gray24") +
+  # geom_line(data=demandaGas_forecast, aes(x = index, y = value), color="red4") +
+  ggtitle("SARIMA train fitted values") +
+  xlab('Dates') +
+  ylab('Demand') + facet_wrap(vars(year(date)), scales = 'free')
+
+``` 
+
+
+```{r}
+aug %>% filter(year(date) == 2013) %>% 
+  ggplot() +
+  geom_line(aes(x = date, y = .fitted), color="navy") +
+  geom_line(aes(x = date, y = meantemp), color="gray24") +
+  # geom_line(data=demandaGas_forecast, aes(x = index, y = value), color="red4") +
+  ggtitle("SARIMA train fitted values") +
+  xlab('Dates') +
+  ylab('Demand') + facet_wrap(vars(month(date)), scales = 'free')
+```
 
 
 ```{r}
@@ -468,3 +509,5 @@ fit4 %>%
   autoplot(demanda_plot)
 
 ```
+
+
