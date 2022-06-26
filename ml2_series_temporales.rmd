@@ -43,6 +43,8 @@ library(fpp3)
 library(GGally)
 #ibrary(normtest)
 library(forecast)
+#library(nortest)
+library(tseries)
 
 ```
 
@@ -75,6 +77,7 @@ clima_test<-read.csv("DailyDelhiClimateTest.csv",sep = ",")
 
 ```
 
+
 ```{r}
 
 head(clima_train)
@@ -99,6 +102,12 @@ Transformamos formato de variable date de chr a fecha
 clima_train$date<-as.Date(clima_train$date)
 str(clima_train)
 ```
+
+```{r}
+clima_test$date<-as.Date(clima_test$date)
+str(clima_test)
+```
+
 
 Seleccionamos la variable meantemp relativa a la temperatura media en Delhi, que será la que intentaremos predecir.
 ```{r}
@@ -320,5 +329,142 @@ autoarima_model
 fit4 <- temp_train_ts %>%
   model(arima = ARIMA(meantemp ~ pdq(3,1,2) + PDQ(1,0,0, period = 7)))
 fit4 %>% my_tsresiduals(lag_max = 36)
+
+```
+
+```{r}
+report(fit4)
+
+```
+
+
+```{r}
+my_t_test(fit4)
+
+```
+
+```{r}
+
+gg_arma(fit4)
+
+``` 
+
+## 3.2 Diagnosis de residuos
+
+```{r}
+aug <-fit4 %>% augment()
+
+# Histogram
+aug %>%
+  ggplot(aes(x = .resid)) +
+  geom_histogram(bins = 50) +
+  ggtitle("Histogram of residuals")
+
+
+``` 
+
+```{r}
+t.test(aug$.resid)
+
+```
+
+
+Test autocorrelaciones
+
+```{r}
+aug %>% features(.resid, ljung_box, lag=24, dof=2)
+
+```
+
+```{r}
+pvals = autocorrelation_test_plot(aug, m = 12, dof = 2, h = 2, alpha = 0.05)
+
+```
+
+```{r}
+pvals
+
+```
+
+
+Test homocedasticidad
+
+```{r}
+log_log <- aug %>% as_tibble() %>% 
+  group_by(week(date)) %>% 
+  summarize(mean_resid = log(mean(.resid+1)), std_resid = log(sd(.resid+1))) 
+
+```
+
+```{r}
+summary(lm(std_resid~mean_resid, log_log))
+
+```
+
+Test de normalidad
+
+```{r}
+#shapiro.test(rstandard(aug$.resid))
+
+```
+
+
+## 3.3... Fase de predicción
+
+```{r}
+# Residual accuracy
+resids <- fit4 %>% 
+  accuracy() %>% 
+  dplyr::select(-c(.model, .type, ME, MPE, ACF1, RMSSE)) %>% 
+  mutate(Evaluation='Training') 
+
+# Forecasting
+fc <- fit4 %>%
+  forecast(h=7) 
+
+test_err <- fc %>% 
+  accuracy(temp_train_ts) %>% 
+  dplyr::select(-c(.model, .type, ME, MPE, ACF1, RMSSE)) %>% 
+  mutate(Evaluation='Test')
+
+# Show errors together
+bind_rows(test_err, resids) %>% dplyr::select(Evaluation, everything())
+
+``` 
+
+```{r}
+clima_total<-merge(x=clima_train,y=clima_test,all = TRUE)
+head(clima_total)
+```
+
+```{r}
+temp_total <- clima_total[,c(1,2)]
+head(temp_total)
+
+temp_total_ts<- as_tsibble(temp_total, index = date)
+
+temp_total_ts
+
+```
+
+
+
+```{r}
+temp_test <- clima_test[,c(1,2)]
+head(temp_train)
+
+temp_test_ts<- as_tsibble(temp_test, index = date)
+
+temp_test_ts
+```
+
+```{r}
+h <- dim(temp_test_ts)[1]
+
+demanda_plot <- temp_total_ts %>% filter(date>last(temp_train_ts$date)-14 & date< last(temp_train_ts$date) + 7 )
+
+fit4 %>%
+  forecast(h=7) %>%
+  autoplot(demanda_plot)
 
 ```
