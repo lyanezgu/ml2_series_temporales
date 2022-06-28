@@ -318,7 +318,7 @@ En los pasos previos hemos detectado la necesidad de realizar una diferencia reg
 
 ```{r}
 fit <- temp_train_ts %>%
-  model(arima = ARIMA(meantemp ~ pdq(0,1,0) + PDQ(0,0,0, period = 12)))
+  model(arima = ARIMA(meantemp ~ pdq(0,1,0) + PDQ(0,0,0, period = 24)))
 fit %>% my_tsresiduals(lag_max = 36)
 
 ```
@@ -376,12 +376,38 @@ my_t_test(fit2)
 ```{r}
 #ajuste del modelo automatica
 
-autoarima_model<- auto.arima(temp_train_ts)
-autoarima_model
+#autoarima_model<- auto.arima(temp_train_ts)
+#autoarima_model
 ```
 
 ```{r}
+#ajuste del modelo automatica
 
+tsdata <- ts(temp_train$meantemp,start=c(2013,1),frequency=365)
+plot(tsdata)
+head(tsdata)
+
+```
+
+```{r}
+#ajuste del modelo automatica
+
+autoarima_model<- auto.arima(y = tsdata)
+autoarima_model
+```
+
+
+
+```{r}
+#ajuste del modelo automatica
+library(forecast)
+pred_auto <-forecast(autoarima_model)
+autoplot(pred_auto)
+```
+
+### 3.2.3. Selección del modelo final
+
+```{r}
 fit4 <- temp_train_ts %>%
   model(arima = ARIMA(meantemp ~ pdq(3,1,2) + PDQ(1,0,0, period = 7)))
 fit4 %>% my_tsresiduals(lag_max = 36)
@@ -404,51 +430,7 @@ gg_arma(fit4)
 
 ``` 
 
-## 3.3. Diagnosis de residuos
-
-### 3.3.1. Residuos modelo manual
-
-```{r}
-aug_ma <-fit2 %>% augment()
-
-# Histogram
-aug_ma %>%
-  ggplot(aes(x = .resid)) +
-  geom_histogram(bins = 50) +
-  ggtitle("Histogram of residuals")
-
-
-``` 
-
-```{r}
-t.test(aug_ma$.resid)
-
-```
-
-
-Test autocorrelaciones
-
-```{r}
-pvals_ma = autocorrelation_test_plot(aug_ma, dof = 4, m = 7,  h = 5, alpha = 0.05)
-pvals_ma
-
-```
-
-Test homocedasticidad
-
-```{r}
-log_log_ma <- aug_ma %>% as_tibble() %>% 
-  group_by(week(date)) %>% 
-  summarize(mean_resid = log(mean(.resid+1)), std_resid = log(sd(.resid+1))) 
-
-```
-
-```{r}
-summary(lm(std_resid~mean_resid, log_log_ma))
-
-```
-
-### 3.3.2. Residuos modelo automático
+## 3.3. Diagnosis de residuos del modelo final
 
 ```{r}
 aug <-fit4 %>% augment()
@@ -498,12 +480,16 @@ Test de normalidad
 ```
 
 
-## 3.4. Predicción con el modelo
+## 3.4. Predicción con el modelo final
+
+Antes de nada, unimos los dataset de train y test que teníamos separados para crear uno total
 
 ```{r}
 clima_total<-merge(x=clima_train,y=clima_test,all = TRUE)
 head(clima_total)
 ```
+
+El dataset creado con los datos totales lo pasamos a tsibble
 
 ```{r}
 temp_total <- clima_total[,c(1,2)]
@@ -515,75 +501,7 @@ temp_total_ts
 
 ```
 
-### 3.4.1. Predicción modelo manual
-
-```{r}
-# Residual accuracy
-resids_ma <- fit2 %>% 
-  accuracy() %>% 
-  dplyr::select(-c(.model, .type, ME, MPE, ACF1, RMSSE)) %>% 
-  mutate(Evaluation='Training') 
-
-# Forecasting
-fc_ma <- fit2 %>%
-  forecast(h=7) 
-
-test_err_ma <- fc_ma %>% 
-  accuracy(temp_total_ts) %>% 
-  dplyr::select(-c(.model, .type, ME, MPE, ACF1, RMSSE)) %>% 
-  mutate(Evaluation='Test')
-
-# Show errors together
-bind_rows(test_err_ma, resids_ma) %>% dplyr::select(Evaluation, everything())
-
-``` 
-
-
-```{r}
-aug_ma %>%  ggplot() +
-  geom_line(aes(x = date, y = .fitted), color="navy") +
-  geom_line(aes(x = date, y = meantemp), color="gray24") +
-  # geom_line(data=demandaGas_forecast, aes(x = index, y = value), color="red4") +
-  ggtitle("SARIMA train fitted values") +
-  xlab('Dates') +
-  ylab('meantemp') + facet_wrap(vars(year(date)), scales = 'free')
-
-``` 
-
-
-```{r}
-aug_ma %>% filter(year(date) == 2013) %>% 
-  ggplot() +
-  geom_line(aes(x = date, y = .fitted), color="navy") +
-  geom_line(aes(x = date, y = meantemp), color="gray24") +
-  # geom_line(data=demandaGas_forecast, aes(x = index, y = value), color="red4") +
-  ggtitle("SARIMA train fitted values") +
-  xlab('Dates') +
-  ylab('meantemp') + facet_wrap(vars(month(date)), scales = 'free')
-```
-
-
-```{r}
-temp_test <- clima_test[,c(1,2)]
-head(temp_train)
-
-temp_test_ts<- as_tsibble(temp_test, index = date)
-
-temp_test_ts
-```
-
-```{r}
-h_ma <- dim(temp_test_ts)[1]
-
-demanda_plot_ma <- temp_total_ts %>% filter(date>last(temp_train_ts$date)-14 & date< last(temp_train_ts$date) + 7 )
-
-fit2 %>%
-  forecast(h=7) %>%
-  autoplot(demanda_plot_ma)
-
-```
-
-### 3.4.2. Predicción modelo automático
+Comenzamos a realizar la predicción con el modelo final
 
 ```{r}
 # Residual accuracy
@@ -630,6 +548,7 @@ aug %>% filter(year(date) == 2013) %>%
   ylab('meantemp') + facet_wrap(vars(month(date)), scales = 'free')
 ```
 
+El dataset con los datos de test lo pasamos a tsibble
 
 ```{r}
 temp_test <- clima_test[,c(1,2)]
