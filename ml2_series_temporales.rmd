@@ -318,15 +318,15 @@ En los pasos previos hemos detectado la necesidad de realizar una diferencia reg
 
 ```{r}
 fit <- temp_train_ts %>%
-  model(arima = ARIMA(meantemp ~ pdq(0,1,0) + PDQ(0,0,0, period = 7)))
-fit %>% my_tsresiduals(lag_max = 56)
+  model(arima = ARIMA(meantemp ~ pdq(0,1,0) + PDQ(0,0,0, period = 12)))
+fit %>% my_tsresiduals(lag_max = 36)
 
 ```
 
 ```{r}
 fit11 <- temp_train_ts %>%
-  model(arima = ARIMA(meantemp ~ pdq(2,1,2) + PDQ(0,0,0, period = 7)))
-fit11 %>% my_tsresiduals(lag_max = 56)
+  model(arima = ARIMA(meantemp ~ pdq(1,1,1) + PDQ(0,1,1, period = 7)))
+fit11 %>% my_tsresiduals(lag_max = 36)
 
 ```
 
@@ -342,6 +342,11 @@ my_t_test(fit11)
 ```
 
 ```{r}
+gg_arma(fit11)
+
+``` 
+
+```{r}
 #fit2 <- temp_train_ts %>%
  # model(arima = ARIMA(meantemp ~ pdq(2,1,1) + PDQ(2,0,1, period = 7)))
 #fit2 %>% my_tsresiduals(lag_max = 36)
@@ -350,7 +355,7 @@ my_t_test(fit11)
 
 ```{r}
 fit2 <- temp_train_ts %>%
-  model(arima = ARIMA(meantemp ~ pdq(2,1,2) + PDQ(0,0,0, period = 7)))
+  model(arima = ARIMA(meantemp ~ pdq(3,1,1) + PDQ(2,1,0, period = 7)))
 fit2 %>% my_tsresiduals(lag_max = 36)
 
 ```
@@ -395,7 +400,6 @@ my_t_test(fit4)
 ```
 
 ```{r}
-
 gg_arma(fit4)
 
 ``` 
@@ -425,20 +429,10 @@ t.test(aug_ma$.resid)
 Test autocorrelaciones
 
 ```{r}
-aug_ma %>% features(.resid, ljung_box, lag=24, dof=2)
-
-```
-
-```{r}
-pvals_ma = autocorrelation_test_plot(aug_ma, m = 12, dof = 2, h = 2, alpha = 0.05)
-
-```
-
-```{r}
+pvals_ma = autocorrelation_test_plot(aug_ma, dof = 4, m = 7,  h = 5, alpha = 0.05)
 pvals_ma
 
 ```
-
 
 Test homocedasticidad
 
@@ -477,20 +471,10 @@ t.test(aug$.resid)
 Test autocorrelaciones
 
 ```{r}
-aug %>% features(.resid, ljung_box, lag=24, dof=2)
-
-```
-
-```{r}
-pvals = autocorrelation_test_plot(aug, m = 12, dof = 2, h = 2, alpha = 0.05)
-
-```
-
-```{r}
+pvals = autocorrelation_test_plot(aug, dof = 4, m = 7,  h = 5, alpha = 0.05)
 pvals
 
 ```
-
 
 Test homocedasticidad
 
@@ -562,7 +546,7 @@ aug_ma %>%  ggplot() +
   # geom_line(data=demandaGas_forecast, aes(x = index, y = value), color="red4") +
   ggtitle("SARIMA train fitted values") +
   xlab('Dates') +
-  ylab('Demand') + facet_wrap(vars(year(date)), scales = 'free')
+  ylab('meantemp') + facet_wrap(vars(year(date)), scales = 'free')
 
 ``` 
 
@@ -575,7 +559,7 @@ aug_ma %>% filter(year(date) == 2013) %>%
   # geom_line(data=demandaGas_forecast, aes(x = index, y = value), color="red4") +
   ggtitle("SARIMA train fitted values") +
   xlab('Dates') +
-  ylab('Demand') + facet_wrap(vars(month(date)), scales = 'free')
+  ylab('meantemp') + facet_wrap(vars(month(date)), scales = 'free')
 ```
 
 
@@ -589,7 +573,7 @@ temp_test_ts
 ```
 
 ```{r}
-h <- dim(temp_test_ts)[1]
+h_ma <- dim(temp_test_ts)[1]
 
 demanda_plot_ma <- temp_total_ts %>% filter(date>last(temp_train_ts$date)-14 & date< last(temp_train_ts$date) + 7 )
 
@@ -630,7 +614,7 @@ aug %>%  ggplot() +
   # geom_line(data=demandaGas_forecast, aes(x = index, y = value), color="red4") +
   ggtitle("SARIMA train fitted values") +
   xlab('Dates') +
-  ylab('Demand') + facet_wrap(vars(year(date)), scales = 'free')
+  ylab('meantemp') + facet_wrap(vars(year(date)), scales = 'free')
 
 ``` 
 
@@ -643,7 +627,7 @@ aug %>% filter(year(date) == 2013) %>%
   # geom_line(data=demandaGas_forecast, aes(x = index, y = value), color="red4") +
   ggtitle("SARIMA train fitted values") +
   xlab('Dates') +
-  ylab('Demand') + facet_wrap(vars(month(date)), scales = 'free')
+  ylab('meantemp') + facet_wrap(vars(month(date)), scales = 'free')
 ```
 
 
