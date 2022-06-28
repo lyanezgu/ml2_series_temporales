@@ -19,9 +19,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # 1. Introducción
 
+La práctica a desarrollar consiste en la elaboración y presentación de un informe de un proyecto de Ciencia de Datos, utilizando las técnicas aprendidas durante la asignatura, aplicadas al conjunto de datos seleccionados.
+
 ## 1.1. Lenguaje de programación y herramienta de control de versiones utilizado
-**Link del proyecto en GitHub:**
-https://github.com/lyanezgu/ml2_series_temporales
+
+El grupo eligió trabajar en lenguage R (RStudio version 1.4.1717) y utilizar como herramienta de control de versiones GitHub. El proyecto “/ml2_series temporales” fue creado por Luisa Yánez (usuario “lyanezgu”) y compartido con el otro integrante del grupo, Miguel García (usuario “mgarciasanc2021”).
+
+**Link del proyecto en GitHub:** https://github.com/lyanezgu/ml2_series_temporales
 
 ## 1.2. Paquetes de R
 
@@ -53,11 +57,13 @@ library(tseries)
 
 # 2. Conjunto de datos 
 
-**Link del dataset:**
-https://www.kaggle.com/datasets/sumanthvrao/daily-climate-time-series-data?resource=download&select=DailyDelhiClimateTest.csv
+El conjunto de datos elegido por el grupo se llama “Daily Climate time series data” e incluye información sobre datos diarios climáticos de la ciudad de Delhi en la India en el periodo comprendido entre el 1 de julio de 2013 y el 24 de abril de 2017.
 
+**Link del dataset:** https://www.kaggle.com/datasets/sumanthvrao/daily-climate-time-series-data?resource=download&select=DailyDelhiClimateTest.csv
 
 ## 2.1. Definición de las variables
+
+Empezando ya el análisis inicial del conjunto de datos que tenemos, vemos que las 12 variables que componen los datos pueden ser descritas como:
 
 * **Date:** fecha en formato YYYY-MM-DD
 
@@ -69,17 +75,19 @@ https://www.kaggle.com/datasets/sumanthvrao/daily-climate-time-series-data?resou
 
 * **meanpreassure:** presión medida en atm
 
-
 ## 2.2. Carga de datos
 
-Cargamos los datos ya dividos entre train y test
-```{r  }
-clima_train<-read.csv("DailyDelhiClimateTrain.csv",sep = ",")
-clima_test<-read.csv("DailyDelhiClimateTest.csv",sep = ",")
+El conjunto de datos “Daily Climate time series data” contiene 5 columnas y 1575 filas (1461 de train y 114 de test) y lo obtenemos en formato .CSV, de dos ficheros diferentes.
 
+Cargamos entonces los datos ya dividos entre train y test.
+
+```{r  }
+clima_train <- read.csv("DailyDelhiClimateTrain.csv",sep = ",")
+clima_test <- read.csv("DailyDelhiClimateTest.csv",sep = ",")
 
 ```
 
+Inicialmente, el conjunto de datos de entrenamiento, se ha guardado un dataframe llamado “clima_train” y se ha realizado un estudio inicial sobre su contenido utilizando la función head y summary.
 
 ```{r}
 head(clima_train)
@@ -87,18 +95,23 @@ head(clima_train)
 ```
 
 
+Con la función summary vemos en los estadísticos más importantes de las diferentes variables del dataset y observamos que no existe ningún dato faltante (Na).
+
 ```{r}
 summary(clima_train)
 
 ```
+
+Con la función str vemos los diferentes tipos de datos que tenemos en nuestro dataset, y observamos que la variable date este en formato chr.
 
 ```{r}
 str(clima_train)
 
 ```
 
+## 2.3. Cambio del tipo de variable
 
-Transformamos formato de variable date de chr a fecha
+Transformamos el formato de la variable date de chr a fecha, tanto en el conjunto de datos de train como en el de test.
 
 ```{r}
 clima_train$date<-as.Date(clima_train$date)
@@ -110,6 +123,11 @@ clima_test$date<-as.Date(clima_test$date)
 str(clima_test)
 ```
 
+## 2.4. Definición de los objetivos
+
+El objetivo final del proyecto es conseguir llegar a un modelo de serie temporal que permita realizar una predicción a futuro de la variable temperatura relativa al clima lo más precisa posible.
+
+# 3. Análisis de la serie temporal 
 
 Seleccionamos la variable meantemp relativa a la temperatura media en Delhi, que será la que intentaremos predecir.
 
@@ -118,8 +136,8 @@ temp_train <- clima_train[,c(1,2)]
 head(temp_train)
 ```
 
-
 Creamos el objeto de series temprales  con la función as_tsibble
+
 ```{r}
 temp_train_ts<- as_tsibble(temp_train, index = date)
 
@@ -127,8 +145,7 @@ temp_train_ts
 
 ```
 
-
-Grafico de la serie temporal de la variable meantemp
+Gráfico de la serie temporal de la variable meantemp
 
 ```{r}
 
@@ -139,8 +156,6 @@ temp_train_ts %>%
 
 ```
 
-# 3. Análisis de la serie temporal 
-
 ## 3.1. Estacionariedad
 
 Observando el gráfico parece que hay una componente estacional anual, ya que la forma de las series anuales son iguales.
@@ -150,8 +165,9 @@ temp_train_ts%>%
 gg_season(meantemp, labels = "right")
 
 ```
+
 Calculamos la descomposición STL para observar si existe tendencia y estacionalidad.
-Gráficamente se puede comprobar que existe estacionalidad y una tendencia creciente.Por tanto, parece se puede decir que la serie no es estacionaria en media.
+Gráficamente se puede comprobar que existe estacionalidad y una tendencia creciente.Por tanto, parece que se puede decir que la serie no es estacionaria en media.
 
 ```{r}
 temp_train_ts %>%
@@ -163,7 +179,7 @@ temp_train_ts %>%
 
 ### 3.1.1. Estacionariedad en Varianza
 
-Estudiamos la estacionariedad en varianza. Dado que obtenemos un valor muy próximo a 1, no realizaremos ningún cambio o transformación para ajustar la varianza.
+Estudiamos la estacionariedad en varianza. Dado que obtenemos un valor muy próximo a 1, no realizaremos ningún cambio o transformación Box-Cox para ajustar la varianza y estabilizarla.
 
 ```{r}
 lambda <- temp_train_ts %>%
@@ -298,29 +314,46 @@ return(newList)
 
 ### 3.2.1. Creación manual del modelo
 
+En los pasos previos hemos detectado la necesidad de realizar una diferencia regular y ninguna estacional. Por tanto, comenzaremos con el ajuste de un modelo SARIMA (0,1,0)x(0,0,0)7, sobre la serie.
+
 ```{r}
 fit <- temp_train_ts %>%
-  model(arima = ARIMA(meantemp ~ pdq(0,1,0) + PDQ(0,1,0, period = 7)))
-fit %>% my_tsresiduals(lag_max = 36)
+  model(arima = ARIMA(meantemp ~ pdq(0,1,0) + PDQ(0,0,0, period = 7)))
+fit %>% my_tsresiduals(lag_max = 56)
 
 ```
 
+```{r}
+fit11 <- temp_train_ts %>%
+  model(arima = ARIMA(meantemp ~ pdq(2,1,2) + PDQ(0,0,0, period = 7)))
+fit11 %>% my_tsresiduals(lag_max = 56)
+
+```
+
+```{r}
+report(fit11)
+
+```
+
+
+```{r}
+my_t_test(fit11)
+
+```
+
+```{r}
+#fit2 <- temp_train_ts %>%
+ # model(arima = ARIMA(meantemp ~ pdq(2,1,1) + PDQ(2,0,1, period = 7)))
+#fit2 %>% my_tsresiduals(lag_max = 36)
+
+```
 
 ```{r}
 fit2 <- temp_train_ts %>%
-  model(arima = ARIMA(meantemp ~ pdq(3,1,1) + PDQ(0,1,1, period = 7)))
+  model(arima = ARIMA(meantemp ~ pdq(2,1,2) + PDQ(0,0,0, period = 7)))
 fit2 %>% my_tsresiduals(lag_max = 36)
 
 ```
-
-
-```{r}
-fit3 <- temp_train_ts %>%
-  model(arima = ARIMA(meantemp ~ pdq(0,1,0) + PDQ(0,0,0, period = 7)))
-fit3 %>% my_tsresiduals(lag_max = 36)
-
-```
-
 
 ```{r}
 report(fit2)
@@ -368,6 +401,60 @@ gg_arma(fit4)
 ``` 
 
 ## 3.3. Diagnosis de residuos
+
+### 3.3.1. Residuos modelo manual
+
+```{r}
+aug_ma <-fit2 %>% augment()
+
+# Histogram
+aug_ma %>%
+  ggplot(aes(x = .resid)) +
+  geom_histogram(bins = 50) +
+  ggtitle("Histogram of residuals")
+
+
+``` 
+
+```{r}
+t.test(aug_ma$.resid)
+
+```
+
+
+Test autocorrelaciones
+
+```{r}
+aug_ma %>% features(.resid, ljung_box, lag=24, dof=2)
+
+```
+
+```{r}
+pvals_ma = autocorrelation_test_plot(aug_ma, m = 12, dof = 2, h = 2, alpha = 0.05)
+
+```
+
+```{r}
+pvals_ma
+
+```
+
+
+Test homocedasticidad
+
+```{r}
+log_log_ma <- aug_ma %>% as_tibble() %>% 
+  group_by(week(date)) %>% 
+  summarize(mean_resid = log(mean(.resid+1)), std_resid = log(sd(.resid+1))) 
+
+```
+
+```{r}
+summary(lm(std_resid~mean_resid, log_log_ma))
+
+```
+
+### 3.3.2. Residuos modelo automático
 
 ```{r}
 aug <-fit4 %>% augment()
@@ -443,6 +530,76 @@ temp_total_ts<- as_tsibble(temp_total, index = date)
 temp_total_ts
 
 ```
+
+### 3.4.1. Predicción modelo manual
+
+```{r}
+# Residual accuracy
+resids_ma <- fit2 %>% 
+  accuracy() %>% 
+  dplyr::select(-c(.model, .type, ME, MPE, ACF1, RMSSE)) %>% 
+  mutate(Evaluation='Training') 
+
+# Forecasting
+fc_ma <- fit2 %>%
+  forecast(h=7) 
+
+test_err_ma <- fc_ma %>% 
+  accuracy(temp_total_ts) %>% 
+  dplyr::select(-c(.model, .type, ME, MPE, ACF1, RMSSE)) %>% 
+  mutate(Evaluation='Test')
+
+# Show errors together
+bind_rows(test_err_ma, resids_ma) %>% dplyr::select(Evaluation, everything())
+
+``` 
+
+
+```{r}
+aug_ma %>%  ggplot() +
+  geom_line(aes(x = date, y = .fitted), color="navy") +
+  geom_line(aes(x = date, y = meantemp), color="gray24") +
+  # geom_line(data=demandaGas_forecast, aes(x = index, y = value), color="red4") +
+  ggtitle("SARIMA train fitted values") +
+  xlab('Dates') +
+  ylab('Demand') + facet_wrap(vars(year(date)), scales = 'free')
+
+``` 
+
+
+```{r}
+aug_ma %>% filter(year(date) == 2013) %>% 
+  ggplot() +
+  geom_line(aes(x = date, y = .fitted), color="navy") +
+  geom_line(aes(x = date, y = meantemp), color="gray24") +
+  # geom_line(data=demandaGas_forecast, aes(x = index, y = value), color="red4") +
+  ggtitle("SARIMA train fitted values") +
+  xlab('Dates') +
+  ylab('Demand') + facet_wrap(vars(month(date)), scales = 'free')
+```
+
+
+```{r}
+temp_test <- clima_test[,c(1,2)]
+head(temp_train)
+
+temp_test_ts<- as_tsibble(temp_test, index = date)
+
+temp_test_ts
+```
+
+```{r}
+h <- dim(temp_test_ts)[1]
+
+demanda_plot_ma <- temp_total_ts %>% filter(date>last(temp_train_ts$date)-14 & date< last(temp_train_ts$date) + 7 )
+
+fit2 %>%
+  forecast(h=7) %>%
+  autoplot(demanda_plot_ma)
+
+```
+
+### 3.4.2. Predicción modelo automático
 
 ```{r}
 # Residual accuracy
