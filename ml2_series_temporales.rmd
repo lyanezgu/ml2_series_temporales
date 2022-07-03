@@ -1,7 +1,7 @@
 ---
 title: "ML2 - Time Series"
 author: "Luisa Yanez y Miguel García"
-date: "08/07/2022"
+date: "25/07/2022"
 output: 
  html_document:
   code_folding: hide
@@ -63,7 +63,7 @@ El conjunto de datos elegido por el grupo se llama “Daily Climate time series 
 
 ## 2.1. Definición de las variables
 
-Empezando ya el análisis inicial del conjunto de datos que tenemos, vemos que las 12 variables que componen los datos pueden ser descritas como:
+Empezando ya el análisis inicial del conjunto de datos que tenemos, vemos que las 5 variables que componen los datos pueden ser descritas como:
 
 * **Date:** fecha en formato YYYY-MM-DD
 
@@ -102,7 +102,7 @@ summary(clima_train)
 
 ```
 
-Con la función str vemos los diferentes tipos de datos que tenemos en nuestro dataset, y observamos que la variable date este en formato chr.
+Con la función str vemos los diferentes tipos de datos que tenemos en nuestro dataset, y observamos que la variable date está en formato chr.
 
 ```{r}
 str(clima_train)
@@ -136,7 +136,7 @@ temp_train <- clima_train[,c(1,2)]
 head(temp_train)
 ```
 
-Creamos el objeto de series temprales  con la función as_tsibble
+Creamos el objeto de serie temporal con la función as_tsibble
 
 ```{r}
 temp_train_ts<- as_tsibble(temp_train, index = date)
@@ -145,7 +145,7 @@ temp_train_ts
 
 ```
 
-Gráfico de la serie temporal de la variable meantemp
+Gráfico de la serie temporal de la variable meantemp que queremos anañizar y predecir
 
 ```{r}
 
@@ -155,6 +155,8 @@ temp_train_ts %>%
     xlab("Años") + ylab("Temperatura") 
 
 ```
+A simple vista podemos ver cierto componente estacional en las temperaturas que se registran año a año, y una leve tendencia positiva.
+
 
 ## 3.1. Estacionariedad
 
@@ -179,7 +181,7 @@ temp_train_ts %>%
 
 ### 3.1.1. Estacionariedad en Varianza
 
-Estudiamos la estacionariedad en varianza. Dado que obtenemos un valor muy próximo a 1, no realizaremos ningún cambio o transformación Box-Cox para ajustar la varianza y estabilizarla.
+Ahora estudiamos la estacionariedad en varianza. Dado que obtenemos un valor muy próximo a 1, no realizaremos ningún cambio o transformación Box-Cox para ajustar la varianza y estabilizarla, ya que como podemos observar si se aprecia estacionariedad en varianza.
 
 ```{r}
 lambda <- temp_train_ts %>%
@@ -229,6 +231,8 @@ temp_train_ts %>%
 
 
 ## 3.2. Creación del modelo (determinación, estimación y contraste)
+
+Creamos las funciones auxiliares que nos servirán para la creación y evaluación del modelo.
 
 ```{r}
 # Contraste para los coeficientes
@@ -314,7 +318,7 @@ return(newList)
 
 ### 3.2.1. Creación manual del modelo
 
-En los pasos previos hemos detectado la necesidad de realizar una diferencia regular y ninguna estacional. Por tanto, comenzaremos con el ajuste de un modelo SARIMA (0,1,0)x(0,0,0)7, sobre la serie.
+En los pasos previos hemos detectado la necesidad de realizar una diferencia regular, pero no una estacional. Por tanto, comenzaremos con el ajuste de un modelo SARIMA (0,1,0)x(0,0,0)[7], sobre la serie.
 
 ```{r}
 fit <- temp_train_ts %>%
@@ -323,63 +327,81 @@ fit %>% my_tsresiduals(lag_max = 36)
 
 ```
 
+Viendo los resultados obtenidos en las gráficas de acf y pacf, empezamos ajustando la serie temporal añadiendo al modelo un 1 en el parámetro "q" relativo a MA en la parte regular de la serie.
+
 ```{r}
-fit11 <- temp_train_ts %>%
+fit1 <- temp_train_ts %>%
   model(arima = ARIMA(meantemp ~ pdq(0,1,1) + PDQ(0,0,0, period = 7)))
-fit11 %>% my_tsresiduals(lag_max = 36)
+fit1 %>% my_tsresiduals(lag_max = 36)
 
 ```
 
+Añadimos al modelo un 2 en el parámetro "q" relativo a MA en la parte regular de la serie, ya que observamos en las graficas acf/pacf como aún el segundo y tercer lag se salen de las bandas.
+
 ```{r}
-fit11 <- temp_train_ts %>%
+fit1 <- temp_train_ts %>%
   model(arima = ARIMA(meantemp ~ pdq(0,1,2) + PDQ(0,0,0, period = 7)))
-fit11 %>% my_tsresiduals(lag_max = 36)
+fit1 %>% my_tsresiduals(lag_max = 36)
 
 ```
 
+Añadimos al modelo un 3 en el parámetro "q" relativo a MA en la parte regular de la serie, basándonos en los resultados obtenidos y viendp que el tercer lag en las gráficas de acf/pacf se sigue saliendo de las bandas.
+
 ```{r}
-fit11 <- temp_train_ts %>%
+fit1 <- temp_train_ts %>%
   model(arima = ARIMA(meantemp ~ pdq(0,1,3) + PDQ(0,0,0, period = 7)))
-fit11 %>% my_tsresiduals(lag_max = 36)
+fit1 %>% my_tsresiduals(lag_max = 36)
 
 ```
 
+Por último añadimos al modelo un 1 en el parámetro "P" relativo a AR en la parte estacional de la serie.
+
 ```{r}
-fit11 <- temp_train_ts %>%
+fit1 <- temp_train_ts %>%
   model(arima = ARIMA(meantemp ~ pdq(0,1,3) + PDQ(1,0,0, period = 7)))
-fit11 %>% my_tsresiduals(lag_max = 36)
+fit1 %>% my_tsresiduals(lag_max = 36)
 
 ```
 
+Comprobemos la calidad estadística del modelo creado:
+
 ```{r}
-report(fit11)
+report(fit1)
 
 ```
 
 
 ```{r}
-my_t_test(fit11)
+my_t_test(fit1)
 
 ```
 
+No es posible identificar más estructura a partir del ACF y PACF, no hay problemas de estacionariedad o invertibilidad. Vemos que todos los parámetros son significativos a excepción de SAR1, cuyo p.value es superior a 0.05. Algunas de las autocorrelaciones se siguen saliendo minimamente de las bandas.
+
+
+### 3.2.2. Creación automática del modelo
+
+Utilizamos la función de auto.arima para tratar de obtener un modelo ajustado a nuestra serie temporal generado de forma automática.
+
 ```{r}
-gg_arma(fit11)
+#ajuste del modelo automatica
 
-``` 
-
-```{r}
-#fit2 <- temp_train_ts %>%
- # model(arima = ARIMA(meantemp ~ pdq(2,1,1) + PDQ(2,0,1, period = 7)))
-#fit2 %>% my_tsresiduals(lag_max = 36)
-
+autoarima_model<- auto.arima(temp_train_ts)
+autoarima_model
 ```
+
+El resultado que obtenemos con la función es un SARIMA (3,1,2)x(1,0,0)[7].
+
 
 ```{r}
 fit2 <- temp_train_ts %>%
-  model(arima = ARIMA(meantemp ~ pdq(3,1,1) + PDQ(2,1,0, period = 7)))
+  model(arima = ARIMA(meantemp ~ pdq(3,1,2) + PDQ(1,0,0, period = 7)))
 fit2 %>% my_tsresiduals(lag_max = 36)
 
 ```
+
+Vemos como la gráfica ACF/PACF obtenida con el modelo SARIMA (3,1,2)x(1,0,0)[7] que nos arroja la función de auto.arima, es muy similar a la obtenida con el modelo SARIMA (0,1,0)x(0,0,0)[7] sjutado de forma manual.No es posible tampoco identificar más estructura a partir del ACF y PACF.
+
 
 ```{r}
 report(fit2)
@@ -392,66 +414,23 @@ my_t_test(fit2)
 
 ```
 
-### 3.2.2. Creación automática del modelo
-
-```{r}
-#ajuste del modelo automatica
-
-autoarima_model<- auto.arima(temp_train_ts)
-autoarima_model
-```
-
-```{r}
-#ajuste del modelo automatica
-
-#tsdata <- ts(temp_train$meantemp,start=c(2013,1),frequency=365)
-#plot(tsdata)
-#head(tsdata)
-
-```
-
-```{r}
-#ajuste del modelo automatica
-
-#autoarima_model<- auto.arima(y = tsdata)
-#autoarima_model
-```
+Vemos que la mayor parte de los parámetros no son significativos a excepción de AR3, cuyo p.value es inferior a 0.05.
 
 
+## 3.3. Diagnosis de residuos del modelo final
 
-```{r}
-#ajuste del modelo automatica
-#library(forecast)
-#pred_auto <-forecast(autoarima_model)
-#autoplot(pred_auto)
-```
-
-### 3.2.3. Selección del modelo final
+Finalmente optamos por quedarnos con el modelo ajustado de forma manual: SARIMA (0,1,0)x(0,0,0)[7]
 
 ```{r}
 fit4 <- temp_train_ts %>%
-  model(arima = ARIMA(meantemp ~ pdq(3,1,2) + PDQ(1,0,0, period = 7)))
+  model(arima = ARIMA(meantemp ~ pdq(0,1,3) + PDQ(1,0,0, period = 7)))
 fit4 %>% my_tsresiduals(lag_max = 36)
 
 ```
 
-```{r}
-report(fit4)
+**TEST NORMALIDAD:**
 
-```
-
-
-```{r}
-my_t_test(fit4)
-
-```
-
-```{r}
-gg_arma(fit4)
-
-``` 
-
-## 3.3. Diagnosis de residuos del modelo final
+Para completar la fase de contraste del modelo evaluamos sus residuos.
 
 ```{r}
 aug <-fit4 %>% augment()
@@ -465,13 +444,21 @@ aug %>%
 
 ``` 
 
+Observando el histograma relativo a los residuos del modelo podemos ver que parece que la media es cero y que sigue medianamente una distribución normal.
+
+Realizamos un test de T-Student para contrastar si realmente la media es cero.
+
 ```{r}
 t.test(aug$.resid)
 
 ```
 
+Como p-value > 0.05 no podemos rechazar la hipótesis de que la muestra tiene media 0.
 
-Test autocorrelaciones
+
+**TEST AUTOCORRELACIONES:**
+
+Ahora intentamos comprobar con un test de Ljung-Box que los residuos están incorrelados a través de un test de autocorrelación.
 
 ```{r}
 pvals = autocorrelation_test_plot(aug, dof = 4, m = 7,  h = 5, alpha = 0.05)
@@ -479,7 +466,12 @@ pvals
 
 ```
 
-Test homocedasticidad
+Los p-valores son mayores de 0.05 en la mayoría de las autocorrelaciones. Por lo tanto, podemos concluir que los residuos no están correlados.
+
+
+**TEST HOMOCEDASTICIDAD:**
+
+Utilizamos un regresión media-dispersión para tratar de contrastar la heterocedasticidad (varianza de los errores no es constante). El cálculo de las agrupaciones temporales se realiza de forma anual debido a que esa es la estacionalidad de la serie analizada.
 
 ```{r}
 log_log <- aug %>% as_tibble() %>% 
@@ -493,17 +485,12 @@ summary(lm(std_resid~mean_resid, log_log))
 
 ```
 
-Test de normalidad
-
-```{r}
-#shapiro.test(rstandard(aug$.resid))
-
-```
+Como el p-valor de log(media) es grande, entonces no puede considerarse distinto de 0 y por tanto los residuos son homocedásticos (varianza de los errores es constante).
 
 
 ## 3.4. Predicción con el modelo final
 
-Antes de nada, unimos los dataset de train y test que teníamos separados para crear uno total
+Antes de nada, unimos los dataset de train y test que teníamos separados para crear uno total de la serie temporal completa.
 
 ```{r}
 clima_total<-merge(x=clima_train,y=clima_test,all = TRUE)
@@ -522,7 +509,7 @@ temp_total_ts
 
 ```
 
-Comenzamos a realizar la predicción con el modelo final
+Comenzamos a realizar la predicción con el modelo final y a evaluar su capacidad predictiva. Calculamos las predicciones en el conjunto de test, calculamos sus errores y los comparamos con los residuos.
 
 ```{r}
 # Residual accuracy
@@ -546,6 +533,8 @@ bind_rows(test_err, resids) %>% dplyr::select(Evaluation, everything())
 ``` 
 
 
+Tratamos de evaluar también año a año la serie temporal real con la predicha para evaluar así los errores, detectar atípicos y analizar efectos de calendario sobre la misma.
+
 ```{r}
 aug %>%  ggplot() +
   geom_line(aes(x = date, y = .fitted), color="navy") +
@@ -556,7 +545,6 @@ aug %>%  ggplot() +
   ylab('meantemp') + facet_wrap(vars(year(date)), scales = 'free')
 
 ``` 
-
 
 ```{r}
 aug %>% filter(year(date) == 2013) %>% 
@@ -569,7 +557,10 @@ aug %>% filter(year(date) == 2013) %>%
   ylab('meantemp') + facet_wrap(vars(month(date)), scales = 'free')
 ```
 
-El dataset con los datos de test lo pasamos a tsibble
+Vemos en los gráficos mensuales mostrados como hay un problema en la predicción de la serie, mostrando un cierto retardo en la estimación de los valores.
+
+
+Para finalmente tratar de ver la capacidad predictora del modelo, transformamos el dataset con los datos de test a tsibble.
 
 ```{r}
 temp_test <- clima_test[,c(1,2)]
@@ -579,6 +570,8 @@ temp_test_ts<- as_tsibble(temp_test, index = date)
 
 temp_test_ts
 ```
+
+Analizamos la capacidad predictora del modelo y sus intervalos de confianza.
 
 ```{r}
 h <- dim(temp_test_ts)[1]
@@ -591,9 +584,14 @@ fit4 %>%
 
 ```
 
+Vemos que la capacidad predictora de nuestro modelo es mala en el periodo de 7 días analizado. Tenemos una serie con multiestacionalidad y un modelo que no está siendo capaz de captarla y representarla, por lo que las predicciones que obtenemos no son las deseadas. Deberíamos tratar de utilizar técnicas y modelos más complejos que traten de ajustarse de mejor forma a las características de nuestra serie.
+
+
 # 4. Modelo de Naive Bayes estacional
 
-Convertimos la serie estacional a TS
+Para tratar de comparar el modelo SARIMA creado con alguna alternativa que nos permita realizar una mejor predicción, desarrollamos un modelo Naive Bayes estacional para nuestra serie.
+
+Inicialmente convertimos los datos de nuestra serie temporal estacional a TS.
 
 ```{r}
 ts_train_ts <- ts(temp_train$meantemp, start = c(2013,1), frequency=365)
@@ -601,29 +599,32 @@ head(ts_train_ts)
 
 ```
 
+A través de la función Window cogemos la venta temporal sobre la que queremos realizar la predicción con el modelo de Bayes.
+
 ```{r}
-ts_naive <- window(ts_train_ts,start=c(2013,1),end=c(2016,12))
+ts_naive <- window(ts_train_ts,start=c(2013,1),end=c(2017,1))
 
 autoplot(ts_naive) 
 
 ```
 
-```{r}
-ts_naive <- window(ts_train_ts,start=c(2013,1),end=c(2016,12))
+Con la función SNAIVE y los datos de la serie ya transformados a TS, creamos el modelo de Naive Bayes estacional para realizar la predicción de los datos.
 
-ts_naive_forcast <- snaive(ts_naive ,h=365)
+```{r}
+ts_naive_forecast <- snaive(ts_naive ,h=114)
+head(ts_naive_forecast)
+plot(ts_naive_forecast)
 
 ```
 
-
-
 ```{r}
-plot(ts_naive_forcast)
+ts_total_ts <- ts(temp_total$meantemp, start = c(2013,1), frequency=365)
+head(ts_total_ts)
 
+autoplot(ts_total_ts) 
 ```
 
-
-
+Vemos que la predicción realizada con el modelo de Naive Bayes es más precisa en este caso que la realizada con SARIMA, obteniendo un forecast con los datos de test cercano a los datos reales.
 
 
 
